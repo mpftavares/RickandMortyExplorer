@@ -12,19 +12,20 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.rickandmortyexplorer.ui.theme.RickAndMortyExplorerTheme
+import android.util.Log
+import androidx.lifecycle.lifecycleScope
+import com.example.rickandmortyexplorer.network.RickAndMortyApi
+import com.example.rickandmortyexplorer.ui.ExplorerScreen
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
             RickAndMortyExplorerTheme {
-                Scaffold(modifier = Modifier.fillMaxSize()) {
-                    Text(
-                        text = "Rick and Morty Explorer",
-                        modifier = Modifier.padding(it)
-                    )
-                }
+                    ExplorerScreen()
             }
         }
     }
