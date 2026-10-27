@@ -45,6 +45,7 @@ fun ExplorerScreen(viewModel: ExplorerViewModel = viewModel()) {
     val state by viewModel.uiState.collectAsState()
     val current = state.current
     val error = state.error
+    val saveMessage = state.saveMessage
 
     Scaffold(topBar = {
         TopAppBar(
@@ -109,6 +110,14 @@ fun ExplorerScreen(viewModel: ExplorerViewModel = viewModel()) {
                 enabled = state.items.size > 1 && !state.isLoading,
                 modifier = Modifier.fillMaxWidth()
             ) { Text("🎲 Roll Random Item") }
+
+            Button(
+                onClick = viewModel::save,
+                enabled = current != null && !state.isLoading,
+                modifier = Modifier.fillMaxWidth()
+            ) { Text("🔖 Save Item") }
+
+            if (saveMessage != null) Text(saveMessage)
         }
     }
 }

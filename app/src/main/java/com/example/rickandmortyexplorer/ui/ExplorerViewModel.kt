@@ -6,6 +6,7 @@ import com.example.rickandmortyexplorer.model.Character
 import com.example.rickandmortyexplorer.model.Episode
 import com.example.rickandmortyexplorer.model.Location
 import com.example.rickandmortyexplorer.network.RickAndMortyApi
+import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,17 +17,21 @@ import kotlinx.coroutines.launch
 import retrofit2.HttpException
 import java.io.IOException
 
-enum class Category(val label: String) {
-    CHARACTER("Character"),
-    EPISODE("Episode"),
-    LOCATION("Location")
+enum class Category(val label: String, val fieldLabels: List<String>) {
+    CHARACTER("Character", listOf("Status", "Species")),
+    EPISODE("Episode", listOf("Episode", "Air date")),
+    LOCATION("Location", listOf("Type", "Dimension"))
 }
 
 data class DisplayItem(
+    val category: Category,
     val name: String,
     val imageUrl: String?,
-    val fields: List<Pair<String, String>>
-)
+    val values: List<String>
+) {
+    // junta cada label da categoria ao valor na mesma posição
+    val fields get() = category.fieldLabels.zip(values)
+}
 
 data class ExplorerUiState(
     val category: Category = Category.CHARACTER,
@@ -35,17 +40,18 @@ data class ExplorerUiState(
     val items: List<DisplayItem> = emptyList(),
     val current: DisplayItem? = null,
     val isLoading: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val saveMessage: String? = null
 )
 
 private fun Character.toDisplayItem() =
-    DisplayItem(name, image, listOf("Status" to status, "Species" to species))
+    DisplayItem(Category.CHARACTER, name, image, listOf(status, species))
 
 private fun Episode.toDisplayItem() =
-    DisplayItem(name, null, listOf("Episode" to episode, "Air date" to airDate))
+    DisplayItem(Category.EPISODE, name, null, listOf(episode, airDate))
 
 private fun Location.toDisplayItem() =
-    DisplayItem(name, null, listOf("Type" to type, "Dimension" to dimension))
+    DisplayItem(Category.LOCATION, name, null, listOf(type, dimension))
 
 class ExplorerViewModel : ViewModel() {
 
@@ -53,6 +59,7 @@ class ExplorerViewModel : ViewModel() {
     val uiState: StateFlow<ExplorerUiState> = _uiState.asStateFlow()
 
     private var loadJob: Job? = null
+    private val db = FirebaseDatabase.getInstance().reference
 
     init {
         load()
@@ -71,7 +78,21 @@ class ExplorerViewModel : ViewModel() {
     fun roll() {
         _uiState.update { state ->
             val others = state.items.filter { it != state.current }
-            state.copy(current = others.randomOrNull() ?: state.current)
+            state.copy(current = others.randomOrNull() ?: state.current, saveMessage = null)
+        }
+    }
+
+    fun save() {
+        val item = _uiState.value.current ?: return
+        val data = mapOf(
+            "category" to item.category.name,
+            "name" to item.name,
+            "imageUrl" to item.imageUrl,
+            "fields" to item.fields.toMap()
+        )
+        db.child("lastSaved").setValue(data).addOnCompleteListener { task ->
+            val message = if (task.isSuccessful) "Item saved" else "Save failed"
+            _uiState.update { it.copy(saveMessage = message) }
         }
     }
 
@@ -82,7 +103,7 @@ class ExplorerViewModel : ViewModel() {
             val state = _uiState.value
             val name = state.query.ifBlank { null }
             val api = RickAndMortyApi.retrofitService
-            _uiState.update { it.copy(isLoading = true, error = null) }
+            _uiState.update { it.copy(isLoading = true, error = null, saveMessage = null) }
             try {
                 val (count, items) = when (state.category) {
                     Category.CHARACTER -> api.getCharacters(name)
