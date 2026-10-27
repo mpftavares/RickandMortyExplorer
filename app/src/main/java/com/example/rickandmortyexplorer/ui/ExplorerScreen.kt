@@ -111,11 +111,18 @@ fun ExplorerScreen(viewModel: ExplorerViewModel = viewModel()) {
                 modifier = Modifier.fillMaxWidth()
             ) { Text("🎲 Roll Random Item") }
 
-            Button(
-                onClick = viewModel::save,
-                enabled = current != null && !state.isLoading,
-                modifier = Modifier.fillMaxWidth()
-            ) { Text("🔖 Save Item") }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(
+                    onClick = viewModel::save,
+                    enabled = current != null && !state.isLoading,
+                    modifier = Modifier.weight(1f)
+                ) { Text("🔖 Save Item") }
+                Button(
+                    onClick = viewModel::loadLast,
+                    enabled = !state.isLoading,
+                    modifier = Modifier.weight(1f)
+                ) { Text("☁️ Load Last") }
+            }
 
             if (saveMessage != null) Text(saveMessage)
         }

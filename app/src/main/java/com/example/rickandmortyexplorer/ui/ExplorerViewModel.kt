@@ -6,6 +6,7 @@ import com.example.rickandmortyexplorer.model.Character
 import com.example.rickandmortyexplorer.model.Episode
 import com.example.rickandmortyexplorer.model.Location
 import com.example.rickandmortyexplorer.network.RickAndMortyApi
+import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.FirebaseDatabase
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
@@ -53,6 +54,17 @@ private fun Episode.toDisplayItem() =
 private fun Location.toDisplayItem() =
     DisplayItem(Category.LOCATION, name, null, listOf(type, dimension))
 
+private fun DataSnapshot.toDisplayItem(): DisplayItem? {
+    val categoryName = child("category").getValue(String::class.java)
+    val category = Category.entries.find { it.name == categoryName } ?: return null
+    return DisplayItem(
+        category,
+        child("name").getValue(String::class.java).orEmpty(),
+        child("imageUrl").getValue(String::class.java),
+        category.fieldLabels.map { child("fields").child(it).getValue(String::class.java).orEmpty() }
+    )
+}
+
 class ExplorerViewModel : ViewModel() {
 
     private val _uiState = MutableStateFlow(ExplorerUiState())
@@ -96,7 +108,20 @@ class ExplorerViewModel : ViewModel() {
         }
     }
 
-    private fun load() {
+    fun loadLast() {
+        db.child("lastSaved").get().addOnCompleteListener { task ->
+            val item = if (task.isSuccessful) task.result.toDisplayItem() else null
+            if (item == null) {
+                val message = if (task.isSuccessful) "Nothing saved yet" else "Load failed"
+                _uiState.update { it.copy(saveMessage = message) }
+            } else {
+                _uiState.update { it.copy(category = item.category, query = "") }
+                load(keep = item)
+            }
+        }
+    }
+
+    private fun load(keep: DisplayItem? = null) {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
             delay(300)
@@ -114,7 +139,7 @@ class ExplorerViewModel : ViewModel() {
                         .let { r -> r.info.count to r.results.map { it.toDisplayItem() } }
                 }
                 _uiState.update {
-                    it.copy(isLoading = false, totalCount = count, items = items, current = items.randomOrNull())
+                    it.copy(isLoading = false, totalCount = count, items = items, current = keep ?: items.randomOrNull())
                 }
             } catch (e: HttpException) {
                 // a API responde 404 quando o filtro não encontra nada
