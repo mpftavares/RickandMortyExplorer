@@ -124,16 +124,15 @@ class ExplorerViewModel : ViewModel() {
             "fields" to item.fields.toMap()
         )
  
-        db.child("history").push().setValue(data)
-        db.child("lastSaved").setValue(data).addOnCompleteListener { task ->
+        db.child("history").push().setValue(data).addOnCompleteListener { task ->
             val message = if (task.isSuccessful) "Item saved" else "Save failed"
             _uiState.update { it.copy(saveMessage = message) }
         }
     }
 
     fun loadLast() {
-        db.child("lastSaved").get().addOnCompleteListener { task ->
-            val item = if (task.isSuccessful) task.result.toDisplayItem() else null
+        db.child("history").orderByKey().limitToLast(1).get().addOnCompleteListener { task ->
+            val item = if (task.isSuccessful) task.result.children.firstOrNull()?.toDisplayItem() else null
             if (item == null) {
                 val message = if (task.isSuccessful) "Nothing saved yet" else "Load failed"
                 _uiState.update { it.copy(saveMessage = message) }
