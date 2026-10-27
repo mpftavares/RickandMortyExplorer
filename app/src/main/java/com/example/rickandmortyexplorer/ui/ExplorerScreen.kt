@@ -93,7 +93,8 @@ fun ExplorerScreen(viewModel: ExplorerViewModel = viewModel()) {
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(12.dp)) {
-                    Text("API Stats", fontWeight = FontWeight.Bold)
+                    Text("Firebase & API Stats", fontWeight = FontWeight.Bold)
+                    Text("Total Rolls: ${state.rollCount}", fontWeight = FontWeight.Bold)
                     Text("Total ${state.category.label}s in API: ${state.totalCount}")
                     Text("Retrieved in current view: ${state.items.size} items")
                 }

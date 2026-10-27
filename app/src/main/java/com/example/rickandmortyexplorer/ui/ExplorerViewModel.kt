@@ -7,7 +7,10 @@ import com.example.rickandmortyexplorer.model.Episode
 import com.example.rickandmortyexplorer.model.Location
 import com.example.rickandmortyexplorer.network.RickAndMortyApi
 import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ServerValue
+import com.google.firebase.database.ValueEventListener
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -42,7 +45,8 @@ data class ExplorerUiState(
     val current: DisplayItem? = null,
     val isLoading: Boolean = false,
     val error: String? = null,
-    val saveMessage: String? = null
+    val saveMessage: String? = null,
+    val rollCount: Long = 0
 )
 
 private fun Character.toDisplayItem() =
@@ -72,9 +76,24 @@ class ExplorerViewModel : ViewModel() {
 
     private var loadJob: Job? = null
     private val db = FirebaseDatabase.getInstance().reference
+    private val rollCountRef = db.child("rollCount")
+
+    private val rollCountListener = object : ValueEventListener {
+        override fun onDataChange(snapshot: DataSnapshot) {
+            val count = snapshot.getValue(Long::class.java) ?: 0
+            _uiState.update { it.copy(rollCount = count) }
+        }
+
+        override fun onCancelled(error: DatabaseError) {}
+    }
 
     init {
         load()
+        rollCountRef.addValueEventListener(rollCountListener)
+    }
+
+    override fun onCleared() {
+        rollCountRef.removeEventListener(rollCountListener)
     }
 
     fun selectCategory(category: Category) {
@@ -92,6 +111,8 @@ class ExplorerViewModel : ViewModel() {
             val others = state.items.filter { it != state.current }
             state.copy(current = others.randomOrNull() ?: state.current, saveMessage = null)
         }
+ 
+        rollCountRef.setValue(ServerValue.increment(1))
     }
 
     fun save() {
