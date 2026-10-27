@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "498256138061",
+    "firebase_url": "https://rick-and-morty-explorer-804cb-default-rtdb.europe-west1.firebasedatabase.app",
+    "project_id": "rick-and-morty-explorer-804cb",
+    "storage_bucket": "rick-and-morty-explorer-804cb.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:498256138061:android:05c6efa9a165201e4df104",
+        "android_client_info": {
+          "package_name": "com.example.rickandmortyexplorer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCVUXXKkg1D5mj999ZHyQjxDXf88Jfqj1g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
