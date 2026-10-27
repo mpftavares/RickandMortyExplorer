@@ -123,6 +123,8 @@ class ExplorerViewModel : ViewModel() {
             "imageUrl" to item.imageUrl,
             "fields" to item.fields.toMap()
         )
+ 
+        db.child("history").push().setValue(data)
         db.child("lastSaved").setValue(data).addOnCompleteListener { task ->
             val message = if (task.isSuccessful) "Item saved" else "Save failed"
             _uiState.update { it.copy(saveMessage = message) }
