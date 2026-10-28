@@ -33,7 +33,6 @@ data class DisplayItem(
     val imageUrl: String?,
     val values: List<String>
 ) {
-    // junta cada label da categoria ao valor na mesma posição
     val fields get() = category.fieldLabels.zip(values)
 }
 
@@ -65,7 +64,9 @@ private fun DataSnapshot.toDisplayItem(): DisplayItem? {
         category,
         child("name").getValue(String::class.java).orEmpty(),
         child("imageUrl").getValue(String::class.java),
-        category.fieldLabels.map { child("fields").child(it).getValue(String::class.java).orEmpty() }
+        category.fieldLabels.map {
+            child("fields").child(it).getValue(String::class.java).orEmpty()
+        }
     )
 }
 
@@ -111,7 +112,7 @@ class ExplorerViewModel : ViewModel() {
             val others = state.items.filter { it != state.current }
             state.copy(current = others.randomOrNull() ?: state.current, saveMessage = null)
         }
- 
+
         rollCountRef.setValue(ServerValue.increment(1))
     }
 
@@ -123,7 +124,7 @@ class ExplorerViewModel : ViewModel() {
             "imageUrl" to item.imageUrl,
             "fields" to item.fields.toMap()
         )
- 
+
         db.child("history").push().setValue(data).addOnCompleteListener { task ->
             val message = if (task.isSuccessful) "Item saved" else "Save failed"
             _uiState.update { it.copy(saveMessage = message) }
@@ -132,7 +133,8 @@ class ExplorerViewModel : ViewModel() {
 
     fun loadLast() {
         db.child("history").orderByKey().limitToLast(1).get().addOnCompleteListener { task ->
-            val item = if (task.isSuccessful) task.result.children.firstOrNull()?.toDisplayItem() else null
+            val item =
+                if (task.isSuccessful) task.result.children.firstOrNull()?.toDisplayItem() else null
             if (item == null) {
                 val message = if (task.isSuccessful) "Nothing saved yet" else "Load failed"
                 _uiState.update { it.copy(saveMessage = message) }
@@ -155,19 +157,33 @@ class ExplorerViewModel : ViewModel() {
                 val (count, items) = when (state.category) {
                     Category.CHARACTER -> api.getCharacters(name)
                         .let { r -> r.info.count to r.results.map { it.toDisplayItem() } }
+
                     Category.EPISODE -> api.getEpisodes(name)
                         .let { r -> r.info.count to r.results.map { it.toDisplayItem() } }
+
                     Category.LOCATION -> api.getLocations(name)
                         .let { r -> r.info.count to r.results.map { it.toDisplayItem() } }
                 }
                 _uiState.update {
-                    it.copy(isLoading = false, totalCount = count, items = items, current = keep ?: items.randomOrNull())
+                    it.copy(
+                        isLoading = false,
+                        totalCount = count,
+                        items = items,
+                        current = keep ?: items.randomOrNull()
+                    )
                 }
             } catch (e: HttpException) {
                 // a API responde 404 quando o filtro não encontra nada
-                val message = if (e.code() == 404) "No results for \"${state.query}\"" else "Server error (${e.code()})"
+                val message =
+                    if (e.code() == 404) "No results for \"${state.query}\"" else "Server error (${e.code()})"
                 _uiState.update {
-                    it.copy(isLoading = false, totalCount = 0, items = emptyList(), current = null, error = message)
+                    it.copy(
+                        isLoading = false,
+                        totalCount = 0,
+                        items = emptyList(),
+                        current = null,
+                        error = message
+                    )
                 }
             } catch (e: IOException) {
                 _uiState.update { it.copy(isLoading = false, error = "No internet connection") }
