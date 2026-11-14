@@ -7,6 +7,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -27,9 +28,13 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -38,6 +43,8 @@ import coil3.compose.AsyncImage
 import com.example.rickandmortyexplorer.Category
 import com.example.rickandmortyexplorer.DisplayItem
 import com.example.rickandmortyexplorer.ExplorerViewModel
+import com.example.rickandmortyexplorer.LocationPhoto
+import java.io.File
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,6 +53,18 @@ fun ExplorerScreen(viewModel: ExplorerViewModel = viewModel()) {
     val current = state.current
     val error = state.error
     val saveMessage = state.saveMessage
+    var showCamera by rememberSaveable { mutableStateOf(false) }
+
+    if (showCamera) {
+        CameraScreen(
+            onPhotoTaken = { file, location ->
+                viewModel.savePhoto(file, location?.latitude, location?.longitude)
+                showCamera = false
+            },
+            onBack = { showCamera = false }
+        )
+        return
+    }
 
     Scaffold(topBar = {
         TopAppBar(
@@ -103,7 +122,10 @@ fun ExplorerScreen(viewModel: ExplorerViewModel = viewModel()) {
             when {
                 state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                 error != null -> Text(error, color = MaterialTheme.colorScheme.error)
-                current != null -> ItemCard(current)
+                current != null -> {
+                    ItemCard(current)
+                    state.photo?.let { PhotoCard(it) }
+                }
             }
 
             Button(
@@ -123,6 +145,13 @@ fun ExplorerScreen(viewModel: ExplorerViewModel = viewModel()) {
                     enabled = !state.isLoading,
                     modifier = Modifier.weight(1f)
                 ) { Text("☁️ Load Last") }
+            }
+
+            if (current?.category == Category.LOCATION) {
+                OutlinedButton(
+                    onClick = { showCamera = true },
+                    modifier = Modifier.fillMaxWidth()
+                ) { Text("📷 Take Photo Here") }
             }
 
             if (saveMessage != null) Text(saveMessage)
@@ -168,6 +197,38 @@ private fun ItemCard(item: DisplayItem) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(label, style = MaterialTheme.typography.labelSmall)
                         Text(value.ifBlank { "-" }, style = MaterialTheme.typography.bodyLarge)
+                    }
+                }
+            }
+        }
+    }
+}
+@Composable
+private fun PhotoCard(photo: LocationPhoto) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text("📷 Your photo here", fontWeight = FontWeight.Bold)
+            AsyncImage(
+                model = File(photo.path),
+                contentDescription = "Photo taken at this location",
+                contentScale = ContentScale.Crop,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(240.dp)
+                    .clip(RoundedCornerShape(12.dp))
+            )
+            HorizontalDivider()
+            Row(modifier = Modifier.fillMaxWidth()) {
+                listOf("Latitude" to photo.latitude, "Longitude" to photo.longitude).forEach { (label, value) ->
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(label, style = MaterialTheme.typography.labelSmall)
+                        Text(value?.let { "%.5f".format(it) } ?: "-", style = MaterialTheme.typography.bodyLarge)
                     }
                 }
             }

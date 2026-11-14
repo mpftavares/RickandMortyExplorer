@@ -19,6 +19,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import retrofit2.HttpException
+import java.io.File
 import java.io.IOException
 
 enum class Category(val label: String, val fieldLabels: List<String>) {
@@ -45,8 +46,13 @@ data class ExplorerUiState(
     val isLoading: Boolean = false,
     val error: String? = null,
     val saveMessage: String? = null,
-    val rollCount: Long = 0
+    val rollCount: Long = 0,
+    val photo: LocationPhoto? = null
 )
+
+data class LocationPhoto(val path: String, val latitude: Double?, val longitude: Double?)
+
+private fun DisplayItem.photoKey() = name.replace(Regex("[.#$\\[\\]/]"), "_")
 
 private fun Character.toDisplayItem() =
     DisplayItem(Category.CHARACTER, name, image, listOf(status, species))
@@ -77,6 +83,7 @@ class ExplorerViewModel : ViewModel() {
 
     private var loadJob: Job? = null
     private val db = FirebaseDatabase.getInstance().reference
+    private val photosRef = db.child("photos")
     private val rollCountRef = db.child("rollCount")
 
     private val rollCountListener = object : ValueEventListener {
@@ -112,6 +119,7 @@ class ExplorerViewModel : ViewModel() {
             val others = state.items.filter { it != state.current }
             state.copy(current = others.randomOrNull() ?: state.current, saveMessage = null)
         }
+        loadPhoto()
 
         rollCountRef.setValue(ServerValue.increment(1))
     }
@@ -145,6 +153,35 @@ class ExplorerViewModel : ViewModel() {
         }
     }
 
+    // a foto fica no telemóvel e no Firebase só fica o caminho e as coordenadas
+    fun savePhoto(file: File, latitude: Double?, longitude: Double?) {
+        val item = _uiState.value.current ?: return
+        _uiState.value.photo?.let { File(it.path).delete() } // só guardamos uma foto por local
+        val photo = LocationPhoto(file.path, latitude, longitude)
+        photosRef.child(item.photoKey()).setValue(
+            mapOf("path" to photo.path, "latitude" to photo.latitude, "longitude" to photo.longitude)
+        )
+        _uiState.update { it.copy(photo = photo) }
+    }
+
+    private fun loadPhoto() {
+        val item = _uiState.value.current
+        _uiState.update { it.copy(photo = null) }
+        if (item?.category != Category.LOCATION) return
+        photosRef.child(item.photoKey()).get().addOnSuccessListener { snapshot ->
+            val path = snapshot.child("path").getValue(String::class.java)
+            // o ficheiro pode já não existir e a resposta pode chegar depois de um Roll
+            if (path != null && File(path).exists() && _uiState.value.current == item) {
+                val photo = LocationPhoto(
+                    path,
+                    snapshot.child("latitude").getValue(Double::class.java),
+                    snapshot.child("longitude").getValue(Double::class.java)
+                )
+                _uiState.update { it.copy(photo = photo) }
+            }
+        }
+    }
+
     private fun load(keep: DisplayItem? = null) {
         loadJob?.cancel()
         loadJob = viewModelScope.launch {
@@ -172,6 +209,7 @@ class ExplorerViewModel : ViewModel() {
                         current = keep ?: items.randomOrNull()
                     )
                 }
+                loadPhoto()
             } catch (e: HttpException) {
                 // a API responde 404 quando o filtro não encontra nada
                 val message =
