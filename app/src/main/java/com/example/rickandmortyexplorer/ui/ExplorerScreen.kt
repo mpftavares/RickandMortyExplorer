@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
@@ -122,10 +121,7 @@ fun ExplorerScreen(viewModel: ExplorerViewModel = viewModel()) {
             when {
                 state.isLoading -> CircularProgressIndicator(modifier = Modifier.align(Alignment.CenterHorizontally))
                 error != null -> Text(error, color = MaterialTheme.colorScheme.error)
-                current != null -> {
-                    ItemCard(current)
-                    state.photo?.let { PhotoCard(it) }
-                }
+                current != null -> ItemCard(current, state.photo)
             }
 
             Button(
@@ -160,7 +156,7 @@ fun ExplorerScreen(viewModel: ExplorerViewModel = viewModel()) {
 }
 
 @Composable
-private fun ItemCard(item: DisplayItem) {
+private fun ItemCard(item: DisplayItem, photo: LocationPhoto?) {
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier
@@ -172,10 +168,13 @@ private fun ItemCard(item: DisplayItem) {
             val imageModifier = Modifier
                 .size(200.dp)
                 .clip(RoundedCornerShape(12.dp))
-            if (item.imageUrl != null) {
+            // a foto tirada no local tem prioridade sobre a imagem da API
+            val image = photo?.let { File(it.path) } ?: item.imageUrl
+            if (image != null) {
                 AsyncImage(
-                    model = item.imageUrl,
+                    model = image,
                     contentDescription = item.name,
+                    contentScale = ContentScale.Crop,
                     modifier = imageModifier
                 )
             } else {
@@ -192,45 +191,26 @@ private fun ItemCard(item: DisplayItem) {
                 textAlign = TextAlign.Center
             )
             HorizontalDivider()
-            Row(modifier = Modifier.fillMaxWidth()) {
-                item.fields.forEach { (label, value) ->
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(label, style = MaterialTheme.typography.labelSmall)
-                        Text(value.ifBlank { "-" }, style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
+            FieldsRow(item.fields)
+            if (photo != null) {
+                FieldsRow(
+                    listOf(
+                        "Latitude" to photo.latitude?.let { "%.5f".format(it) }.orEmpty(),
+                        "Longitude" to photo.longitude?.let { "%.5f".format(it) }.orEmpty()
+                    )
+                )
             }
         }
     }
 }
+
 @Composable
-private fun PhotoCard(photo: LocationPhoto) {
-    Card(modifier = Modifier.fillMaxWidth()) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
-        ) {
-            Text("📷 Your photo here", fontWeight = FontWeight.Bold)
-            AsyncImage(
-                model = File(photo.path),
-                contentDescription = "Photo taken at this location",
-                contentScale = ContentScale.Crop,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(240.dp)
-                    .clip(RoundedCornerShape(12.dp))
-            )
-            HorizontalDivider()
-            Row(modifier = Modifier.fillMaxWidth()) {
-                listOf("Latitude" to photo.latitude, "Longitude" to photo.longitude).forEach { (label, value) ->
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(label, style = MaterialTheme.typography.labelSmall)
-                        Text(value?.let { "%.5f".format(it) } ?: "-", style = MaterialTheme.typography.bodyLarge)
-                    }
-                }
+private fun FieldsRow(fields: List<Pair<String, String>>) {
+    Row(modifier = Modifier.fillMaxWidth()) {
+        fields.forEach { (label, value) ->
+            Column(modifier = Modifier.weight(1f)) {
+                Text(label, style = MaterialTheme.typography.labelSmall)
+                Text(value.ifBlank { "-" }, style = MaterialTheme.typography.bodyLarge)
             }
         }
     }
